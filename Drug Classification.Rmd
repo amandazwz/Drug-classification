@@ -1,0 +1,126 @@
+---
+title: "Drug Classification"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+library(fastDummies)
+library(caret)
+library(e1071)
+library(randomForest)
+library(ggplot2)
+```
+
+
+
+```{r}
+data <- read.csv("drug200.csv")
+
+colSums(is.na(data))
+```
+
+
+```{r}
+data$Sex <- as.factor(data$Sex)
+data$BP <- as.factor(data$BP)
+data$Cholesterol <- as.factor(data$Cholesterol)
+data$Drug <- as.factor(data$Drug)
+summary(data)
+```
+
+
+```{r, fig.height=3.7}
+# Create the boxplot
+ggplot(data, aes(x = Drug, y = Age, fill = Drug)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Age Distribution By Drug Class",
+       x = "Drug Class", y = "Age")
+```
+
+
+
+
+```{r, fig.height=3.7}
+# Create the boxplot
+ggplot(data, aes(x = Drug, y = Na_to_K, fill = Drug)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Na_to_K Distribution By Drug Class",
+       x = "Drug Class", y = "Na_to_K")
+```
+
+
+```{r,echo=FALSE, fig.height=3.7}
+p1 <- ggplot(data, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Histogram of Age", x = "Age", y = "Count")
+
+p2 <- ggplot(data, aes(x = Na_to_K)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Histogram of Na_to_K", x = "Na_to_K", y = "Count")
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
+
+```{r}
+set.seed(123)
+# Apply one-hot encoding
+df_encoded <- dummy_cols(data, 
+                         select_columns = c("BP", "Cholesterol", "Sex"),
+                         remove_first_dummy = TRUE, 
+                         remove_selected_columns = TRUE)
+```
+
+
+```{r}
+# Train-test split
+set.seed(123)
+trainIndex <- createDataPartition(df_encoded$Drug, p = 0.8, list = FALSE)
+train <- df_encoded[trainIndex, ]
+test <- df_encoded[-trainIndex, ]
+
+# Train SVM model
+svm_model <- svm(Drug ~ ., data = train, kernel = "radial", 
+                 probability = TRUE)
+
+# Predictions
+svm_preds <- predict(svm_model, test)
+
+# Model evaluation
+cm <- confusionMatrix(factor(svm_preds), factor(test$Drug))
+
+cm$table
+
+cat("The accuracy of the model is : ", cm$overall['Accuracy'])
+```
+
+
+```{r}
+set.seed(123)
+# Train a random forest model
+rf_model <- randomForest(Drug ~ ., data = train, ntree = 100)
+
+# Predictions
+rf_preds <- predict(rf_model, test)
+
+# Compute confusion matrix
+cm <- confusionMatrix(factor(rf_preds), factor(test$Drug), 
+                      mode = "everything")
+
+cm$table
+
+cat("The accuracy of the model is : ", cm$overall['Accuracy'])
+```
+
+
+
+
